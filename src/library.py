@@ -1,7 +1,7 @@
 
 """Library business rules and command-line interface."""
 
-from datetime import date, timedelta
+from datetime import datetime, timedelta
 
 from . import database
 from .constraints import (
@@ -55,9 +55,9 @@ def calculate_fine(due_date, returned_on):
 
 
 def borrow(connection, member_id, book_id, borrowed_on=None):
-    borrowed_on = borrowed_on or date.today()
+    borrowed_on = borrowed_on or datetime.now()
 
-    with connection:
+    with connection.transaction():
         validate_member(connection, member_id)
         check_borrow_limit(connection, member_id)
         check_book_availability(connection, book_id)
@@ -81,9 +81,9 @@ def borrow(connection, member_id, book_id, borrowed_on=None):
 
 
 def return_book(connection, member_id, book_id, returned_on=None):
-    returned_on = returned_on or date.today()
+    returned_on = returned_on or datetime.now()
 
-    with connection:
+    with connection.transaction():
         loan = database.get_active_loan(
             connection, member_id, book_id
         )
@@ -93,7 +93,7 @@ def return_book(connection, member_id, book_id, returned_on=None):
                 "No active loan for this member and book"
             )
 
-        due_date = date.fromisoformat(loan["due_date"])
+        due_date = loan["due_date"]
         fine = calculate_fine(due_date, returned_on)
 
         database.close_loan(connection, loan["id"])
@@ -114,10 +114,7 @@ def main():
     try:
         database.setup(connection)
 
-        if not connection.execute(
-            "SELECT 1 FROM members LIMIT 1"
-        ).fetchone():
-            database.seed_demo_data(connection)
+        database.seed_demo_data(connection)
 
         while True:
             print("\n1. Search  2. Borrow  3. Return  4. Exit")
@@ -145,7 +142,7 @@ def main():
                         due = borrow(
                             connection, member_id, book_id
                         )
-                        print(f"Borrowed. Due: {due}")
+                        print(f"Borrowed. Due: {due.date()}")
 
                     else:
                         fine = return_book(
