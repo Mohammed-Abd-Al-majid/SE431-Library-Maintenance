@@ -1,2 +1,1 @@
-
-"""Simple Library Management System package."""
+"""Refactored Library Management System."""
